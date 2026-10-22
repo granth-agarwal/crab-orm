@@ -1,30 +1,32 @@
 # Portability policy
 
-Phase 1.2 compiles SQLite SQL but executes **no SQL on any backend**. Rust and SQLite are the initial target;
+Phase 1.3 compiles and executes the current subset on SQLite. Rust and SQLite
+are the initial target;
 PostgreSQL/MySQL and Python are later work. Portability means a documented subset
 and explicit capabilities, not identical SQL syntax or coverage of every type.
 
-## Initial owned values and planned SQLite conversion
+## Initial owned values and SQLite conversion
 
-This table defines intended adapter policy, not implemented conversion behavior.
+The optional SQLx SQLite adapter implements these bindings and storage-class decoding.
 SQLite's storage classes/affinity and lack of a separate boolean storage class
 are documented in [SQLite datatypes](https://www.sqlite.org/datatype3.html).
 
-| Owned value | Planned SQLite binding | Decoding/mapping policy |
+| Owned value | SQLite binding | Decoding/mapping policy |
 | --- | --- | --- |
-| `Null` | SQL NULL | Preserve as Null; required model fields reject it with Mapping errors. NULL is not false, zero, or empty text/blob. |
-| `Boolean(bool)` | INTEGER 0/1 | Generic integer decoding stays Integer; boolean model metadata maps only 0/1, rejecting other integers rather than guessing truthiness. |
+| `Null` | SQL NULL | Preserve as Null; future required model fields must reject it with Mapping errors. NULL is not false, zero, or empty text/blob. |
+| `Boolean(bool)` | INTEGER 0/1 | Generic integer decoding stays Integer; future boolean model metadata should map only 0/1, rejecting other integers rather than guessing truthiness. |
 | `Integer(i64)` | Signed 64-bit INTEGER | Preserve range; reject incompatible/range-losing conversions. |
-| `Real(f64)` | REAL | Approximate binary float, not exact decimal; SQLite compilation rejects non-finite values. |
+| `Real(f64)` | REAL | Approximate binary float, not exact decimal; SQLite compilation and binding reject non-finite values. |
 | `Text(String)` | TEXT | Own UTF-8 text; reject decoding that cannot preserve the contract. |
 | `Blob(Vec<u8>)` | BLOB | Own bytes; an empty blob remains distinct from NULL. |
 
 SQLite's dynamic storage classes and column affinity can affect stored results.
-A future adapter must test actual round trips, not infer correctness from these
-Rust types. Raw row integers lack enough information to reconstruct a boolean
-without model/type context. Null binds may need contextual type information in
-other drivers. Unsupported driver decoding becomes a Driver error; incompatible
-model fields become Mapping errors. No silent lossy cross-backend coercion is promised.
+Integration tests cover actual round trips, dynamic storage classes and expression
+columns; decoding checks NULL first and never relies on declared column types.
+Raw row integers lack enough information to reconstruct a boolean without
+model/type context. Null binds may need contextual type information in
+other drivers. Unsupported/invalid driver decoding becomes DriverError::RowConversion;
+incompatible model fields become Mapping errors. No silent lossy cross-backend coercion is promised.
 
 The initial set excludes unsigned wide integers, exact decimal, timestamps,
 time zones, UUIDs, JSON-specific semantics, arrays, enums, and backend extension
@@ -36,7 +38,8 @@ where useful and never Eq.
 
 The compiled SQLite subset is SELECT/INSERT/UPDATE/DELETE, supported column/value
 comparisons, AND/OR grouping, SELECT ordering and limit/offset. It is verified by
-SQL/bind golden tests, not database-result tests. There is no execution implementation.
+SQL/bind goldens and isolated SQLite compiler-to-driver tests. This is not evidence
+of cross-backend parity or model-level ORM correctness.
 Phase 1 targets explicit SQLite insert/read/update/delete, comparisons,
 conjunction/disjunction, null checks, ordering, limit/offset, and basic transactions.
 Joins/aggregates, upserts, returning clauses, savepoints, backend-specific functions,
@@ -63,21 +66,24 @@ quoting or runtime binds. See [query policy](query-types.md) for case-insensitiv
 assignment duplicate rejection and unsupported NULL comparisons. NULL tests and
 schema type checking remain deferred; constructing IR does not validate database semantics.
 
-SQL must contain placeholders and an ordered bind vector. Future drivers must use
-runtime binding in that exact order, never value interpolation. Parameter count,
-type compatibility, and unsupported operations need adapter tests. The implemented
+SQL uses placeholders and an ordered bind vector. The SQLite driver uses runtime
+binding in that exact order, never value interpolation. Prepared parameter counts
+are checked, and unsupported placeholder/statement forms are rejected. The implemented
 compiler uses [SQL plus values from build](https://github.com/SeaQL/sea-query),
-not SQL rendered with values injected for debugging. SQLx runtime APIs will avoid
-requiring a database at compile time.
+not SQL rendered with values injected for debugging. SQLx runtime APIs require
+no database at compile time.
 
 ## Raw SQL and observability
 
-A future explicit raw SQL escape hatch will accept trusted SQL plus owned ordered
-bind values and use the same executor, including a transaction-bound connection
-when applicable. It bypasses compiler guarantees, cannot safely compose untrusted
-SQL fragments, and gives up automatic dialect portability. Bound values are still
-mandatory for user data. Raw SQL execution is not implemented by constructing a
-CompiledQuery today, and no raw SQL convenience method exists.
+Manual CompiledQuery SQL executes through the same adapter using trusted SQL plus
+owned ordered binds. Its current raw subset is one statement with anonymous `?`
+placeholders, optionally followed by one terminator/comments. Named/numbered binds,
+batches, NUL, and unterminated quotes/comments are rejected. See
+[driver restrictions](sqlite-driver.md). A raw SQL convenience API and future
+transaction-bound connection integration are deferred. Raw SQL bypasses compiler
+guarantees, cannot safely compose untrusted SQL fragments, and gives up automatic dialect portability. Bound values are still
+mandatory for user data. Constructing CompiledQuery itself validates nothing;
+the driver checks parameter counts/result shape before execution. No raw SQL convenience method exists.
 
 Default logs must redact parameters and credentials. SQL text can itself contain
 secret literals/comments; query formatting hides it, and explicit inspection

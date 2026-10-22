@@ -1,4 +1,4 @@
-//! Owned execution contracts. No connection, pool, or executor implementation.
+//! Owned execution contracts and an optional single-connection SQLite adapter.
 //!
 //! Future transactions must own or exclusively borrow one acquired connection.
 //! Every operation uses that connection; commit/rollback consumes or closes the
@@ -9,6 +9,11 @@
 use std::future::Future;
 
 use crab_core::{CompiledQuery, OrmError, Value};
+
+#[cfg(feature = "sqlite")]
+mod sqlite;
+#[cfg(feature = "sqlite")]
+pub use sqlite::{SqliteConfig, SqliteExecutor};
 
 /// The outcome of a statement that does not return rows.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,6 +33,9 @@ pub struct ColumnValue {
 
 /// An owned row retaining result-column order and duplicate labels.
 ///
+/// Access columns by position or iterate the vector. There is no implicit
+/// name-to-value lookup: repeated names must not silently overwrite each other.
+///
 /// Model conversion belongs to the ORM layer; unsupported decoding is a driver
 /// error, while incompatible/missing model fields are mapping errors.
 #[derive(Clone, Debug, PartialEq)]
@@ -44,8 +52,8 @@ pub struct Row {
 /// lifetime, owns the query, and returns owned results. It is not necessarily
 /// `'static`: spawning requires moving an owned executor into the task.
 ///
-/// Tokio is the planned adapter runtime; these contracts are runtime independent.
-/// Future implementations must bind values at runtime in parameter order, verify
+/// Tokio is the SQLite adapter runtime; these contracts are runtime independent.
+/// Implementations must bind values at runtime in parameter order, verify
 /// compatibility, and report failures. The trait alone provides no safety checks.
 pub trait DatabaseExecutor: Send {
     /// Execute a statement without returned rows; errors must not become success.
@@ -54,10 +62,18 @@ pub trait DatabaseExecutor: Send {
         query: CompiledQuery,
     ) -> impl Future<Output = Result<ExecutionResult, OrmError>> + Send + '_;
 
+    /// Fetch the first matching row; no row is a typed driver NotFound error.
+    ///
+    /// Additional matches are ignored; use ordering for a deterministic first row.
+    fn fetch_one(
+        &mut self,
+        query: CompiledQuery,
+    ) -> impl Future<Output = Result<Row, OrmError>> + Send + '_;
+
     /// Fetch all rows in result order; an empty vector means no matching rows.
     ///
-    /// This buffers the entire result. Streaming and single-row APIs are deferred.
-    fn fetch(
+    /// This buffers the entire result. Streaming is deferred.
+    fn fetch_all(
         &mut self,
         query: CompiledQuery,
     ) -> impl Future<Output = Result<Vec<Row>, OrmError>> + Send + '_;

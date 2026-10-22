@@ -1,45 +1,39 @@
-//! Compile owned query types through the facade; no database I/O.
+//! Compile and execute owned queries through the facade on private SQLite memory.
 
 use crab_orm::{
-    Assignment, Column, ComparisonOperator as Op, Delete, Insert, Ordering, OrmError, Predicate,
-    Projection, Query, QueryCompiler, Select, SortDirection, SqliteCompiler, Table, Update, Value,
+    Assignment, Column, ComparisonOperator as Op, CompiledQuery, DatabaseExecutor, Insert,
+    OrmError, Predicate, Projection, Query, QueryCompiler, Select, SqliteCompiler, SqliteConfig,
+    SqliteExecutor, Table, Value,
 };
 
-fn main() -> Result<(), OrmError> {
+fn inspect(query: &CompiledQuery) {
+    // These generated statements contain placeholders, not sensitive literals.
+    println!("SQL: {}", query.sql);
+    println!("Parameter count: {} (values redacted)", query.params.len());
+}
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), OrmError> {
+    let mut db = SqliteExecutor::connect(SqliteConfig::in_memory()).await?;
+    db.execute(CompiledQuery {
+        sql: "CREATE TABLE todos (id INTEGER PRIMARY KEY, title TEXT NOT NULL, completed INTEGER NOT NULL)".into(),
+        params: vec![],
+    })
+    .await?;
+
     let todos = Table::new("todos")?;
     let id = Column::new("id")?;
     let title = Column::new("title")?;
     let completed = Column::new("completed")?;
-
-    // (completed = false OR title = a value) AND id > a value.
-    let filter = Predicate::compare(completed.clone(), Op::Equal, Value::Boolean(false))?
-        .or(Predicate::compare(
-            title.clone(),
-            Op::Equal,
-            Value::Text("Read the docs".into()),
-        )?)
-        .and(Predicate::compare(
-            id.clone(),
-            Op::GreaterThan,
-            Value::Integer(0),
-        )?);
-    let select = Select::new(
-        todos.clone(),
-        Projection::columns(vec![id.clone(), title.clone(), completed.clone()])?,
-    )
-    .with_filter(filter)
-    .with_ordering(vec![Ordering {
-        column: id.clone(),
-        direction: SortDirection::Ascending,
-    }])
-    .with_limit(10)
-    .with_offset(0);
-
-    let insert = Insert::new(
+    let insert = Query::Insert(Insert::new(
         todos.clone(),
         vec![
             Assignment {
-                column: title,
+                column: id.clone(),
+                value: Value::Integer(1),
+            },
+            Assignment {
+                column: title.clone(),
                 value: Value::Text("Read the docs".into()),
             },
             Assignment {
@@ -47,38 +41,32 @@ fn main() -> Result<(), OrmError> {
                 value: Value::Boolean(false),
             },
         ],
-    )?;
-    let by_id = Predicate::compare(id, Op::Equal, Value::Integer(1))?;
-    let update = Update::new(
-        todos.clone(),
-        vec![Assignment {
-            column: completed,
-            value: Value::Boolean(true),
-        }],
-        by_id.clone(),
-    )?;
-    let delete = Delete::new(todos, by_id);
+    )?);
+    let compiled = SqliteCompiler.compile(&insert)?;
+    inspect(&compiled);
+    let result = db.execute(compiled).await?;
+    println!("Inserted rows: {}", result.rows_affected);
 
-    let queries = [
-        Query::Select(select),
-        Query::Insert(insert),
-        Query::Update(update),
-        Query::Delete(delete),
-    ];
-    println!(
-        "CrabORM Phase 1.2: compiling {} owned queries to SQLite SQL through the facade.",
-        queries.len()
+    let select = Query::Select(
+        Select::new(
+            todos,
+            Projection::columns(vec![id.clone(), title, completed])?,
+        )
+        .with_filter(Predicate::compare(id, Op::Equal, Value::Integer(1))?),
     );
-    for query in queries {
-        let compiled = SqliteCompiler.compile(&query)?;
-        // Generated SQL contains placeholders; values are deliberately not shown.
-        println!("SQL: {}", compiled.sql);
-        println!(
-            "Parameter count: {} (values redacted)",
-            compiled.params.len()
-        );
+    let compiled = SqliteCompiler.compile(&select)?;
+    inspect(&compiled);
+    let row = db.fetch_one(compiled).await?;
+    // Only this example's fixed, non-sensitive fixture data is inspected.
+    for column in row.columns {
+        match column.value {
+            Value::Integer(value) => println!("{}: {value}", column.name),
+            Value::Text(value) => println!("{}: {value}", column.name),
+            _ => println!("{}: [redacted]", column.name),
+        }
     }
-    println!("Compilation only. No SQLite connection was opened or database contacted.");
-    println!("Database execution and CRUD persistence are not implemented yet.");
+    db.close().await?;
+    println!("In-memory SQLite connection closed. Boolean values read back as integers.");
+    println!("Model-level CRUD helpers and transaction APIs remain future subphases.");
     Ok(())
 }

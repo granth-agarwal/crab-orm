@@ -20,6 +20,9 @@ crab-query = { path = "crates/crab-query" }
 crab-driver = { path = "crates/crab-driver" }
 crab-orm = { path = "crates/crab-orm" }
 sea-query = { version = "1.0.2", default-features = false, features = ["backend-sqlite"] }
+sqlx = { version = "0.9.0", default-features = false, features = ["sqlite-bundled", "runtime-tokio"] }
+tokio = { version = "1.54.1", default-features = false, features = ["rt", "macros"] }
+tempfile = "3.27.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -259,16 +259,16 @@ Each checkbox should be independently implementable and reviewable. A phase is c
 - [x] Return typed errors for unsupported expressions.
 
 **1.3 SQLx SQLite adapter**
-- [ ] Add feature-gated SQLite SQLx dependency.
-- [ ] Implement database URL/config handling.
-- [ ] Implement connect and close behavior.
-- [ ] Implement `execute` for write statements.
-- [ ] Implement `fetch_one`.
-- [ ] Implement `fetch_all`.
-- [ ] Convert portable values into SQLx binds.
-- [ ] Convert SQLx rows into portable row values.
-- [ ] Add a test using a temporary SQLite database.
-- [ ] Add tests for invalid connection, constraint violation and null values.
+- [x] Add feature-gated SQLite SQLx dependency.
+- [x] Implement database URL/config handling.
+- [x] Implement connect and close behavior.
+- [x] Implement `execute` for write statements.
+- [x] Implement `fetch_one`.
+- [x] Implement `fetch_all`.
+- [x] Convert portable values into SQLx binds.
+- [x] Convert SQLx rows into portable row values.
+- [x] Add a test using a temporary SQLite database.
+- [x] Add tests for invalid connection, constraint violation and null values.
 
 **1.4 Model metadata and CRUD**
 - [ ] Define a model metadata structure with table name.

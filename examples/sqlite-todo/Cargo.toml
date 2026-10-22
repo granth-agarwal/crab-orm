@@ -4,10 +4,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
-description = "Compile CrabORM queries to SQLite SQL without database execution"
+description = "Compile and execute portable CrabORM queries on an in-memory SQLite connection"
 
 [dependencies]
-crab-orm.workspace = true
+crab-orm = { workspace = true, features = ["sqlite"] }
+tokio.workspace = true
 
 [lints]
 workspace = true

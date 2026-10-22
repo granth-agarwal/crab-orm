@@ -1,8 +1,8 @@
 # Architecture
 
-Foundations, owned query types, and Phase 1.2 SQLite SQL compilation are implemented.
-There is no connection, executor implementation, transaction handle, model mapper,
-or CRUD persistence.
+Foundations, owned query types, SQLite compilation, and Phase 1.3 SQLx execution
+are implemented. Model metadata/mapping, model-level CRUD helpers, and transaction
+handles remain deferred.
 
 ## Responsibilities and dependency direction
 
@@ -16,9 +16,11 @@ sqlite-todo -> crab-orm -> crab-query  -> crab-core
 `Value`, `CompiledQuery`, and `OrmError`, with no dependencies.
 `crab-query` owns the `QueryCompiler` contract and a private SQLite SeaQuery adapter
 exposed as `SqliteCompiler`, accepting core `Query` input.
-`crab-driver` owns `DatabaseExecutor`, `ExecutionResult`, `Row`, and `ColumnValue`.
+`crab-driver` owns `DatabaseExecutor`, `ExecutionResult`, `Row`, and `ColumnValue`,
+plus optional `SqliteConfig`/`SqliteExecutor` behind its sqlite feature. SQLx types
+are private; default features are empty and the facade forwards sqlite explicitly.
 `crab-orm` deliberately re-exports the public domain contracts and traits; the example
-depends only on that facade. There is no edge between query and driver crates.
+uses that facade and Tokio. There is no edge between query and driver crates.
 Workspace metadata, dependencies, lints, and one generated lockfile are shared as
 described in the [Cargo workspace reference](https://doc.rust-lang.org/cargo/reference/workspaces.html).
 
@@ -55,8 +57,8 @@ values explicitly inspectable. Bind order is placeholder encounter order, never
 map iteration order. This struct performs no validation; manually constructing
 one does not establish SQL safety or placeholder correctness. SqliteCompiler uses
 validated core identifiers, SeaQuery identifier quoting, and parameterized build
-to return deterministic ordered values. Future executors must actually bind each
-value at runtime, never interpolate user data.
+to return deterministic ordered values. The SQLite executor binds each
+value at runtime, never interpolating user data.
 Identifiers cannot be bound like values: their validation/quoting is separate.
 The input now owns predicate and assignment values. Stored column/assignment/
 ordering vectors preserve caller order; predicate children preserve left-to-right
@@ -71,13 +73,24 @@ marker adaptation and dependency/source verification.
 ## Executor and async contract
 
 `DatabaseExecutor: Send` takes `&mut self` and an owned `CompiledQuery`. `execute`
-returns a `Send` future yielding `ExecutionResult { rows_affected: u64 }`; `fetch`
-returns a `Send` future yielding all `Vec<Row>` results, empty when none match.
-Errors remain `OrmError`. Row columns are an ordered vector of name/value pairs,
-so duplicate labels survive decoding; future model mapping must reject ambiguity
-or require explicit aliases. Affected-row semantics depend on backend behavior.
-Fetch buffers its whole result; streaming, generated keys, and single-row methods
-are not provided. Bounded queries will be necessary for large results.
+returns a Send future yielding `ExecutionResult { rows_affected: u64 }`.
+`fetch_one` returns the first Row or typed DriverError::NotFound; additional matches
+are ignored. `fetch_all` returns Vec<Row>, empty when none match, buffering the whole
+result. Row columns are ordered name/value pairs, retaining duplicate labels.
+Access is positional/iterative, without implicit name lookup. Model mapping must
+reject ambiguity or require explicit aliases. Streaming and generated keys are deferred.
+
+The optional SQLite executor owns one connection. SqliteConfig parses URLs or
+accepts literal paths, enables foreign keys, disables statement logging, and requires
+explicit missing-file creation. Consuming `close(self).await` awaits SQLx worker
+shutdown; Drop initiates cleanup without promising synchronous completion.
+Runtime preparation checks result shape and exact parameter count; a lexical guard
+rejects batches and named/numbered placeholders. Values bind in order. Decoding checks
+NULL first, then each cell's actual runtime storage class, preserving dynamic columns
+and expressions. Boolean binds read as Integer(0/1). Typed owned driver categories
+retain useful failures without database messages or sensitive input.
+See [SQLite driver semantics](sqlite-driver.md), including supported raw SQL,
+row decoding, and DDL affected-row normalization.
 
 Native return-position `impl Future + Send + '_` keeps generic/static dispatch
 allocation-free at the trait boundary. This executor trait is **not dyn
@@ -87,11 +100,12 @@ owns its query; output rows own their data. `Send` allows movement between worke
 threads, but borrowing futures cannot simply be spawned as `'static` tasks.
 Move an owned executor into a task when that lifecycle is needed.
 
-Tokio is selected for future async adapters. The contracts use only `std` and the
-current example is synchronous; a runtime dependency would be unused. Async
-avoids a blocking-only service interface but introduces cancellation, lifetime,
-scheduling, and runtime integration responsibilities. A sync facade and dynamic
-executor dispatch require demonstrated use cases and separate decisions.
+Tokio runs the SQLite adapter and example; core contracts remain runtime independent.
+Async avoids a blocking-only service interface but adds cancellation, lifetime,
+scheduling, and runtime integration responsibilities. SQLite uses SQLx's worker
+thread; async does not imply improved throughput. Cancellation can leave execution
+outcomes uncertain. A sync facade and dynamic executor dispatch require demonstrated
+use cases and separate decisions.
 
 ## Transactions and cleanup: design only
 
@@ -108,7 +122,7 @@ arbitrary async work, so a future adapter must document whether it schedules
 rollback or discards the connection, and test cancellation at each lifecycle
 stage. Do not promise synchronous rollback completion on drop. Nested
 transactions/savepoints are deferred. There is intentionally no transaction
-trait or working transaction implementation in Phase 0.
+trait or working transaction implementation through Phase 1.3.
 
 ## Values, errors, and inspection
 
@@ -117,7 +131,9 @@ types; see [conversion and portability policy](portability.md). `Real(f64)` mean
 Value, CompiledQuery, and Row cannot derive `Eq`. Null is a separate value, not
 an absent parameter. `OrmError` distinguishes validation, compile, driver,
 mapping, and transaction failure stages. Validation carries structured context/
-reason/index data; other failures retain owned diagnostic messages.
+reason/index data. Driver failures carry owned DriverError categories/positions,
+including configuration, connection, constraints, not-found, execution and decoding;
+compile, mapping and transaction failures retain diagnostic strings.
 
 CompiledQuery `Debug`/`Display` hides SQL and all binds, exposing only parameter count.
 `Value::Debug` hides payloads, including booleans/numbers and nested row values.
@@ -131,15 +147,15 @@ formatting policy, not memory encryption or a safe logger for arbitrary caller d
 
 | Decision | Current status | Follow-up |
 | --- | --- | --- |
-| Owned values, SQL/binds, error stages | Implemented with default redaction tests | Real conversion and binding tests |
+| Owned values, SQL/binds, errors | Implemented, including typed driver categories and SQLite round trips | Future backend/model conversions |
 | Owned query IR in core | Implemented through Phase 1.1, with invariant tests | Later query features |
-| SQLite compiler | SeaQuery adapter implemented with SQL/bind goldens | Database-result integration tests in execution phase |
-| Executor boundary | Compilable trait only | Implement/test SQLx adapter |
+| SQLite compiler | SeaQuery adapter with SQL/bind goldens and driver integration | Later query features |
+| Executor boundary | Optional single-connection SQLx SQLite adapter and integration tests | Streaming only when scoped |
 | Model/mapping ownership | Documented | Explicit metadata and mapping in Phase 1 |
-| Tokio async-first | Accepted, Send futures implemented | Add runtime when execution exists |
+| Tokio async-first | Send futures and SQLite runtime implemented | Transaction cancellation/cleanup tests |
 | One-connection transaction lifecycle | Documented only | Handle API, cancellation and cleanup tests |
 | Capability errors and SQL subset | Policy only; Compile error category exists | Structured capability identifiers/matrix |
-| Raw SQL escape hatch | Accepted future policy | Explicit runtime API and security tests |
+| Raw SQL escape hatch | Trusted CompiledQuery supported with single-statement/anonymous-bind restrictions | Convenience API and transaction integration |
 | Performance/portability claims | No evidence asserted | Reproducible conformance and benchmarks |
 
 See [scope and research](product-scope.md) and ADRs

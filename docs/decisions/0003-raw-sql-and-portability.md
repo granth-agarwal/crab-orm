@@ -3,10 +3,12 @@
 ## Status
 
 Accepted policy, 2026-10-22. Owned SQL/binds and redacted formatting are implemented.
-Raw SQL execution, capability APIs, and database conformance remain deferred.
+Phase 1.3 executes trusted CompiledQuery SQL with a restricted raw subset; raw SQL
+convenience APIs, capability APIs, and cross-backend conformance remain deferred.
 Phase 1.2 compiles the current owned query subset to SQLite SQL through SeaQuery,
 with quoting, ordered binds, and explicit unsupported-value/range errors. Database
-execution remains absent; SQL/bind goldens do not establish database-result parity.
+execution now has isolated SQLite integration tests; these do not establish
+cross-backend database-result parity.
 
 ## Context
 
@@ -24,10 +26,15 @@ identifiers and detailed unsupported-feature variants will be designed when
 capabilities exist. Never silently omit unsupported clauses or imply portability
 for queries that have not been validated on a backend.
 
-Plan an explicit trusted raw SQL escape hatch using SQL plus ordered owned bind
-values and the same execution/transaction connection rules. It will bypass the
-compiler's portability guarantees. Neither a raw SQL helper nor a working executor
-exists today. Manual CompiledQuery construction validates nothing. Values must
+Keep trusted raw SQL at the existing CompiledQuery boundary using SQL plus ordered
+owned bind values. Phase 1.3 supports one statement and anonymous `?` placeholders
+only, with exact prepared bind counts and execute/fetch result-shape checks.
+A lexical guard rejects batching and named/numbered placeholders without parsing
+SQL grammar; SQLite validates syntax. See [driver restrictions](../sqlite-driver.md).
+The SQLx SqlSafeStr wrapper explicitly marks this trusted boundary, not a sanitizer.
+This bypasses compiler portability guarantees; manual CompiledQuery construction
+validates nothing. A convenience helper, raw query-IR node, and transaction
+integration remain later work. Values must
 always be bound at runtime; untrusted SQL fragments must never be composed into
 the string. Identifier validation/quoting is dialect work, not parameter binding.
 
@@ -42,8 +49,9 @@ of fields or error messages is the caller's responsibility.
 Applications will have an escape route for unsupported queries while accepting
 backend lock-in and responsibility for trusted SQL structure. Shared owned values
 do not make all types portable. Capability and bind-order tests will be required
-for each real adapter, and raw SQL needs injection/transaction tests. No current
-unit test establishes query safety, portability, or execution correctness.
+for each real adapter, and transaction-bound raw SQL will need additional lifecycle tests. Current SQLite
+tests cover binding/injection-shaped data and rejected unsupported raw forms; they
+do not establish arbitrary SQL safety, cross-backend portability, or transactions.
 
 ## Alternatives considered
 

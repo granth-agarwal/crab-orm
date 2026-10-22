@@ -2,18 +2,20 @@
 //! Phase 1.1 adds validated identifiers and query construction, without rendering
 //! SQL, evaluating predicates, or executing database operations.
 //!
-//! SQLite conversions are planned, not implemented: booleans bind as integer 0/1,
+//! The optional SQLite driver binds booleans as integer 0/1;
 //! NULL remains distinct from false, zero, empty text, and empty blobs. SQLite
 //! integers need model metadata to distinguish booleans when mapping rows.
 //! This initial value set does not cover every database type.
 
 use std::{error::Error, fmt};
 
+mod driver_error;
 mod identifier;
 mod predicate;
 mod query;
 mod validation;
 
+pub use driver_error::{ConstraintKind, DriverError};
 pub use identifier::{Column, Table};
 pub use predicate::{Comparison, ComparisonOperator, Predicate};
 pub use query::{
@@ -29,7 +31,7 @@ pub use validation::{ValidationContext, ValidationError, ValidationReason};
 pub enum Value {
     /// SQL NULL; its intended column type comes from model/query context.
     Null,
-    /// A logical boolean; the planned SQLite binding is integer 0 or 1.
+    /// A logical boolean; the SQLite driver binds integer 0 or 1.
     Boolean(bool),
     /// A signed 64-bit integer.
     Integer(i64),
@@ -57,7 +59,7 @@ impl fmt::Debug for Value {
 /// SQL and bind values in placeholder encounter order.
 ///
 /// This is a data contract, not a validator: constructing it does not check SQL,
-/// placeholder counts, dialect compatibility, or safety. Future compilers and
+/// placeholder counts, dialect compatibility, or safety. Compilers and
 /// executors must enforce those rules. Both display formats hide SQL and values;
 /// SQL itself can contain literals or comments with confidential information.
 #[derive(Clone, PartialEq)]
@@ -89,7 +91,7 @@ impl fmt::Display for CompiledQuery {
 
 /// Distinguishable failure stages, with explicitly accessible diagnostics.
 ///
-/// `Display` and `Debug` expose only the failure stage. Non-validation messages can contain
+/// `Display` and `Debug` expose only the failure stage. Diagnostic text can contain
 /// driver details, credentials, or values; inspect them only in trusted contexts.
 /// Adapter error types are deliberately absent from this boundary.
 #[derive(Clone, PartialEq, Eq)]
@@ -99,7 +101,7 @@ pub enum OrmError {
     /// SQL compilation failure, including unsupported dialect capabilities.
     Compile(String),
     /// Connection, binding, execution, or decoding failure in a driver.
-    Driver(String),
+    Driver(DriverError),
     /// A row could not be converted into the requested model.
     Mapping(String),
     /// Beginning, completing, or cleaning up a transaction failed.
@@ -138,7 +140,8 @@ impl Error for OrmError {}
 #[cfg(test)]
 mod tests {
     use super::{
-        CompiledQuery, OrmError, ValidationContext, ValidationError, ValidationReason, Value,
+        CompiledQuery, DriverError, OrmError, ValidationContext, ValidationError, ValidationReason,
+        Value,
     };
 
     #[test]
@@ -190,7 +193,7 @@ mod tests {
                 "validation",
             ),
             (OrmError::Compile(secret.into()), "compile"),
-            (OrmError::Driver(secret.into()), "driver"),
+            (OrmError::Driver(DriverError::Execution), "driver"),
             (OrmError::Mapping(secret.into()), "mapping"),
             (OrmError::Transaction(secret.into()), "transaction"),
         ];

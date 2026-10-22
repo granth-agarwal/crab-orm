@@ -1,4 +1,4 @@
-# SQLite TODO: Phase 1.2 SQL compilation
+# SQLite TODO: Phase 1.3 compiler-to-driver pipeline
 
 Run from the workspace root:
 
@@ -6,24 +6,21 @@ Run from the workspace root:
 cargo run -p sqlite-todo --locked
 ```
 
-This synchronous binary imports only the `crab-orm` facade and constructs:
+The package explicitly enables `crab-orm`'s `sqlite` feature and uses Tokio's
+current-thread runtime. It opens one private in-memory SQLite connection, creates
+a small todos table using explicit setup SQL, constructs and compiles a portable
+INSERT, executes it, then constructs/compiles a filtered SELECT and fetches a row.
+The connection is explicitly closed. No database file or service is needed;
+a C toolchain builds bundled SQLite and initial dependencies require network access.
 
-- A SELECT of `id`, `title`, `completed`, with `(completed = value OR title = value)
-  AND id > value`, ordered by id, with a limit and offset.
-- An INSERT with paired title/completed assignments.
-- An UPDATE of completed, filtered by id.
-- A DELETE filtered by id.
+All application query/row/error types come through the facade. SQLx and SeaQuery
+types stay inside their adapters. The program prints generated SQL, parameter
+counts, affected rows, and the fixed non-sensitive fixture's id/title/completed
+results. Bind values are not printed. The Boolean bind reads back as Integer(0),
+reflecting SQLite's storage classes rather than model metadata.
 
-The program wraps these statements in the core `Query` enum, compiles each with
-the facade's `SqliteCompiler`, and prints generated SQLite SQL plus parameter
-counts. Identifiers are validated and quoted; bind values are not printed.
-Parameters include predicate/assignment values and SELECT pagination, in emitted
-placeholder order. Construction/compilation errors propagate as OrmError.
-
-No schema is created, no database is contacted, and no persistence or transaction
-occurs. SQL is compiled but never prepared/bound/executed on a connection.
-SQLite execution, model mapping, and working CRUD remain later work. No runtime
-or database setup is necessary; initial Cargo dependency downloads need network.
-See [query types and invariants](../../docs/query-types.md) for API examples and
-the explicitly named full-table mutation constructors, and
-[compiler behavior](../../docs/sqlite-compiler.md) for NULL/pagination policies.
+Model-level CRUD helpers, model mapping, schema management, and transaction APIs
+remain future subphases. Explicit CREATE TABLE here is setup, not a migration API.
+See [query construction](../../docs/query-types.md),
+[SQLite compilation](../../docs/sqlite-compiler.md), and
+[driver configuration and limitations](../../docs/sqlite-driver.md).

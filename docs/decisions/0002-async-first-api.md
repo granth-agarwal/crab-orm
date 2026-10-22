@@ -1,9 +1,10 @@
-# ADR 0002: Async-first execution with Tokio as the future runtime
+# ADR 0002: Async-first execution with Tokio
 
 ## Status
 
 Accepted, 2026-10-22. Native Send-future executor signatures are implemented;
-runtime integration, execution, transactions, and cancellation tests are deferred.
+Phase 1.3 integrates Tokio/SQLx SQLite execution. Transactions and cancellation
+conformance tests remain deferred.
 
 ## Context
 
@@ -14,9 +15,13 @@ Pure query compilation does not need an async runtime.
 
 ## Decision
 
-Select Tokio for future adapters. Keep Phase 0 runtime independent and depend only
-on `std` until real execution needs Tokio. The example performs no I/O and is
-synchronous. Keep compiler methods synchronous.
+Select Tokio for async adapters. Keep core execution contracts runtime independent.
+Phase 1.3 enables SQLx runtime-tokio behind sqlite; the example/test runtime uses
+Tokio's current-thread mode. SQLite work runs on SQLx's worker thread. Compiler
+methods stay synchronous. One owned connection fits the mutable executor contract;
+no pool abstraction is needed. Explicit async close consumes the connection and
+awaits worker shutdown; Drop initiates cleanup without synchronous guarantees.
+Cancellation may leave an execution outcome unknown; callers must not assume rollback.
 
 Use `DatabaseExecutor: Send` methods returning native
 `impl Future<Output = Result<..., OrmError>> + Send + '_`, with `&mut self` and an
@@ -33,7 +38,7 @@ handle. A pool executor is not a transaction. Prefer explicit awaited rollback.
 Drop cannot await cleanup, so an adapter must schedule cleanup safely or discard
 the connection, never return an uncertain transaction to a reusable pool. Test
 error, cancellation, drop, and failed-commit paths before claiming correctness.
-No transaction implementation or API is invented in Phase 0.
+No transaction implementation or API exists through Phase 1.3.
 
 ## Consequences
 
@@ -53,5 +58,7 @@ alternatives require concrete use cases and separate design work.
   promise as directly as the chosen explicit future bound.
 - Boxed futures/async-trait: useful for dyn dispatch, but adds allocation or a
   dependency without a Phase 0 need.
+- Pool now: unnecessary ownership/concurrency policy for this single-connection
+  subphase; explicit pooling belongs to a separately scoped change.
 - Pool-level transaction marker: cannot ensure all statements share one connection
   and is rejected as an ownership model.

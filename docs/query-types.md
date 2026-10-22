@@ -116,7 +116,8 @@ identifies table/column identifiers, comparisons, projection, insert, or update;
 reason identifies empty input, invalid identifier start/byte position, unsupported
 NULL comparison, or duplicate assignment index. Rejected input is not copied into
 diagnostics. Matching that variant provides details without parsing messages.
-Other OrmError stages and CompiledQuery's SQL/ordered-bind contract are unchanged.
+Phase 1.3 also replaces Driver's String payload with structured owned DriverError
+categories. CompiledQuery's SQL/ordered-bind contract is unchanged.
 
 Ordinary OrmError Display/Debug continues to reveal only the failure stage.
 Query-tree Debug delegates to Value's payload redaction. Explicit value accessors
@@ -124,8 +125,9 @@ and assignment fields reveal data deliberately and must not be logged blindly.
 Types containing Value derive PartialEq, never Eq, because Value includes f64.
 
 The domain crate has no SeaQuery/SQLx types or dependencies. Phase 1.2 implements
-SQL compilation in a private `crab-query` SeaQuery adapter; database execution,
-model mapping, and working CRUD persistence remain deferred.
+SQL compilation in a private `crab-query` SeaQuery adapter. Phase 1.3 adds optional
+[SQLx SQLite execution](sqlite-driver.md); model mapping and model-level CRUD
+persistence helpers remain deferred.
 Joins, aliases, subqueries, raw SQL nodes, NULL tests, NOT, derive macros, and
 transactions are deferred. Query construction alone is not proof of compilable
 SQL; the compiler can reject unsupported values/ranges. Compilation is not proof

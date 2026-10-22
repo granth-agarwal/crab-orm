@@ -22,8 +22,9 @@ fn compile_todos() -> Result<(), OrmError> {
 ```
 
 This produces `SELECT * FROM "todos" LIMIT ?` with one parameter. The
-[runnable example](../examples/sqlite-todo/README.md) compiles all four statements
-and a grouped filter. Neither prints values or contacts a database.
+[runnable example](../examples/sqlite-todo/README.md) now compiles and executes
+INSERT/SELECT using the optional [SQLite driver](sqlite-driver.md). This compiler
+usage snippet alone opens no connection and prints no bind values.
 
 ## Mapping, quoting, and bind order
 
@@ -46,7 +47,7 @@ Every statement uses parameterized **build**, never literal-rendering `to_string
 Bind order comes exclusively from SeaQuery's emitted Values, converted fallibly
 into owned values. UPDATE assignment binds precede predicate binds; SELECT
 predicate binds precede pagination binds. Each `?` corresponds to one Vec element.
-Future execution must actually bind those values at runtime in that order.
+The optional SQLite driver binds those values at runtime in that order.
 
 ## Values and failures
 
@@ -54,7 +55,7 @@ Null, Boolean, Integer(i64), finite Real(f64), Text, and Blob retain their varia
 NULL assignments remain bound parameters, distinct from false, zero, and empty
 text/blobs. NULL comparisons are rejected by core constructors and defensively
 by the compiler. IS NULL/IS NOT NULL are not present in the current IR.
-Boolean remains Boolean in CompiledQuery; future SQLite execution will encode
+Boolean remains Boolean in CompiledQuery; SQLite execution encodes
 it as integer 0/1. This adapter does not perform database encoding.
 
 NaN/infinities and out-of-range pagination return `OrmError::Compile` with static,
@@ -103,5 +104,6 @@ Reachable compile failures cover non-finite reals and overflow; private conversi
 tests cover unexpected bind types and marker mismatches. Tests need no database,
 credentials, or network at runtime. They verify output, not schema validity,
 constraints, result correctness, transactions, or portability across backends.
-SQLx execution, model mapping, raw SQL, joins, aliases, subqueries, NOT, explicit
+SQLx execution is now implemented separately in the optional driver. Model mapping,
+raw query-IR nodes, joins, aliases, subqueries, NOT, explicit
 NULL predicates, and other later subphases remain deferred.

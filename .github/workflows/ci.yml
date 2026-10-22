@@ -18,11 +18,29 @@ jobs:
         run: rustup show active-toolchain
       - name: Formatting
         run: cargo fmt --all -- --check
+      - name: Libraries without SQLite
+        # The example explicitly enables sqlite; exclude it to avoid feature unification.
+        run: |
+          cargo build --workspace --exclude sqlite-todo --no-default-features --locked
+          cargo test --workspace --exclude sqlite-todo --no-default-features --locked
+      - name: Verify optional driver stays disabled
+        run: |
+          python3 - <<'PY'
+          import re
+          import subprocess
+          tree = subprocess.check_output([
+              "cargo", "tree", "-p", "crab-driver", "-p", "crab-orm",
+              "--no-default-features", "--edges", "normal", "--prefix", "none", "--locked",
+          ], text=True)
+          print(tree)
+          if re.search(r"^sqlx(?:-\S+)? v", tree, re.MULTILINE):
+              raise SystemExit("SQLx unexpectedly enabled in default library dependency graph")
+          PY
       - name: Clippy
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Tests
-        run: cargo test --workspace --locked
+        run: cargo test --workspace --all-features --locked
       - name: Build
-        run: cargo build --workspace --locked
+        run: cargo build --workspace --all-features --locked
       - name: Example smoke check
         run: cargo run -p sqlite-todo --locked

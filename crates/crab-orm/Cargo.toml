@@ -4,12 +4,19 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
-description = "Public facade for CrabORM contracts and owned query construction"
+description = "Public facade for CrabORM queries, SQLite compilation, and optional execution"
+
+[features]
+default = []
+sqlite = ["crab-driver/sqlite"]
 
 [dependencies]
 crab-core.workspace = true
 crab-query.workspace = true
 crab-driver.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
 
 [lints]
 workspace = true

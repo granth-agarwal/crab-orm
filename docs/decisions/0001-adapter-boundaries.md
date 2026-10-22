@@ -3,8 +3,8 @@
 ## Status
 
 Accepted, 2026-10-22. Owned contracts and facade are implemented in Phase 0;
-Phase 1.2 implements the SQLite SeaQuery compiler; SQLx execution and substitution
-conformance remain deferred.
+Phase 1.2 implements the SQLite SeaQuery compiler; Phase 1.3 implements the
+optional SQLx SQLite executor. Substitution conformance remains deferred.
 Phase 1.1 replaces the temporary query input with owned domain types in core.
 
 ## Context
@@ -29,9 +29,13 @@ owned input into SQLite SQL plus values using parameterized build and emitted
 bind order. Identifiers are validated in core and quoted by the SQLite builder.
 Only crab-query depends on SeaQuery 1.0.2, with backend-sqlite enabled and defaults
 disabled. Offset-only queries use a checked internal unbounded-limit adaptation;
-see [compiler details](../sqlite-compiler.md). A future [SQLx](https://github.com/launchbadge/sqlx)
-adapter binds values at runtime and decodes owned rows; no compile-time database
-is required. Dependencies are added only when their adapter is implemented.
+see [compiler details](../sqlite-compiler.md). The optional [SQLx](https://github.com/launchbadge/sqlx)
+0.9.0 adapter binds values at runtime and decodes owned rows using each cell's
+storage class; no compile-time database is required. SQLx stays only in crab-driver
+behind sqlite, default features off, with sqlite-bundled and runtime-tokio.
+Configuration and consuming close expose only owned CrabORM APIs. DriverError
+categories discard database messages while retaining constraints/not-found/indexes.
+See [driver details](../sqlite-driver.md). Dependencies are added only when their adapter is implemented.
 User values must never be interpolated into SQL. Unsupported operations produce
 explicit errors. Default diagnostics must redact parameters and credentials.
 
@@ -40,7 +44,9 @@ explicit errors. Default diagnostics must redact parameters and credentials.
 Callers can depend on the facade alone. Third-party lifetimes/types stay inside
 adapters, while owned conversion may cost copies/allocations and requires semantic
 mapping tests. Dependency/API upgrades still need review: the researched SQLx
-0.9.0 runtime query input has a `SqlSafeStr` bound. No performance benefit follows
+0.9.0 runtime query input has a `SqlSafeStr` bound; the adapter explicitly marks
+the trusted CompiledQuery SQL boundary, binds data separately, and checks counts.
+This wrapper does not sanitize caller-provided SQL. No performance benefit follows
 from these boundaries. Compiler replacement remains unproven until two real
 implementations pass equivalent database-result fixtures without caller changes.
 Preview contract changes are expected as types mature.
