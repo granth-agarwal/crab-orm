@@ -1,0 +1,15 @@
+[package]
+name = "crab-orm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Public facade for CrabORM's Phase 0 contracts"
+
+[dependencies]
+crab-core.workspace = true
+crab-query.workspace = true
+crab-driver.workspace = true
+
+[lints]
+workspace = true

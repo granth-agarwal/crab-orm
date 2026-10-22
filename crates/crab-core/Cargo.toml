@@ -1,0 +1,10 @@
+[package]
+name = "crab-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Owned values, compiled queries, and errors for CrabORM"
+
+[lints]
+workspace = true

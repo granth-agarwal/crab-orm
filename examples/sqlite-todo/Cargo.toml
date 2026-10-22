@@ -1,0 +1,13 @@
+[package]
+name = "sqlite-todo"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Inspect a CrabORM Phase 0 query contract without connecting to SQLite"
+
+[dependencies]
+crab-orm.workspace = true
+
+[lints]
+workspace = true
