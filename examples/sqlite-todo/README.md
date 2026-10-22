@@ -1,4 +1,4 @@
-# SQLite TODO: Phase 1.1 query construction
+# SQLite TODO: Phase 1.2 SQL compilation
 
 Run from the workspace root:
 
@@ -14,13 +14,16 @@ This synchronous binary imports only the `crab-orm` facade and constructs:
 - An UPDATE of completed, filtered by id.
 - A DELETE filtered by id.
 
-Those expressions describe an owned tree; the program does not render them into
-SQL. It wraps the statements in the core `Query` enum and reports the count and
-construction status. It does not print bind values. All identifiers pass the
-conservative core validation policy. Construction errors propagate as OrmError.
+The program wraps these statements in the core `Query` enum, compiles each with
+the facade's `SqliteCompiler`, and prints generated SQLite SQL plus parameter
+counts. Identifiers are validated and quoted; bind values are not printed.
+Parameters include predicate/assignment values and SELECT pagination, in emitted
+placeholder order. Construction/compilation errors propagate as OrmError.
 
 No schema is created, no database is contacted, and no persistence or transaction
-occurs. SQL compilation, parameter binding, SQLite execution, model mapping, and
-working CRUD remain later work. No runtime or database setup is necessary.
+occurs. SQL is compiled but never prepared/bound/executed on a connection.
+SQLite execution, model mapping, and working CRUD remain later work. No runtime
+or database setup is necessary; initial Cargo dependency downloads need network.
 See [query types and invariants](../../docs/query-types.md) for API examples and
-the explicitly named full-table mutation constructors.
+the explicitly named full-table mutation constructors, and
+[compiler behavior](../../docs/sqlite-compiler.md) for NULL/pagination policies.

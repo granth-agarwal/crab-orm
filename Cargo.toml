@@ -19,6 +19,7 @@ crab-core = { path = "crates/crab-core" }
 crab-query = { path = "crates/crab-query" }
 crab-driver = { path = "crates/crab-driver" }
 crab-orm = { path = "crates/crab-orm" }
+sea-query = { version = "1.0.2", default-features = false, features = ["backend-sqlite"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

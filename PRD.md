@@ -247,16 +247,16 @@ Each checkbox should be independently implementable and reviewable. A phase is c
 - [x] Unit-test each query representation constructor.
 
 **1.2 SeaQuery adapter**
-- [ ] Map `SELECT` IR to SeaQuery statements.
-- [ ] Map `INSERT` IR to SeaQuery statements.
-- [ ] Map `UPDATE` IR to SeaQuery statements.
-- [ ] Map `DELETE` IR to SeaQuery statements.
-- [ ] Map each supported predicate to SeaQuery expressions.
-- [ ] Compile SQLite SQL with bind placeholders.
-- [ ] Produce ordered bound values.
-- [ ] Test values never appear interpolated in SQL.
-- [ ] Add SQL golden tests for all four statement types.
-- [ ] Return typed errors for unsupported expressions.
+- [x] Map `SELECT` IR to SeaQuery statements.
+- [x] Map `INSERT` IR to SeaQuery statements.
+- [x] Map `UPDATE` IR to SeaQuery statements.
+- [x] Map `DELETE` IR to SeaQuery statements.
+- [x] Map each supported predicate to SeaQuery expressions.
+- [x] Compile SQLite SQL with bind placeholders.
+- [x] Produce ordered bound values.
+- [x] Test values never appear interpolated in SQL.
+- [x] Add SQL golden tests for all four statement types.
+- [x] Return typed errors for unsupported expressions.
 
 **1.3 SQLx SQLite adapter**
 - [ ] Add feature-gated SQLite SQLx dependency.

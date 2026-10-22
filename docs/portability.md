@@ -1,6 +1,6 @@
 # Portability policy
 
-Phase 1.1 constructs queries but executes **no SQL on any backend**. Rust and SQLite are the initial target;
+Phase 1.2 compiles SQLite SQL but executes **no SQL on any backend**. Rust and SQLite are the initial target;
 PostgreSQL/MySQL and Python are later work. Portability means a documented subset
 and explicit capabilities, not identical SQL syntax or coverage of every type.
 
@@ -15,7 +15,7 @@ are documented in [SQLite datatypes](https://www.sqlite.org/datatype3.html).
 | `Null` | SQL NULL | Preserve as Null; required model fields reject it with Mapping errors. NULL is not false, zero, or empty text/blob. |
 | `Boolean(bool)` | INTEGER 0/1 | Generic integer decoding stays Integer; boolean model metadata maps only 0/1, rejecting other integers rather than guessing truthiness. |
 | `Integer(i64)` | Signed 64-bit INTEGER | Preserve range; reject incompatible/range-losing conversions. |
-| `Real(f64)` | REAL | Approximate binary float, not exact decimal; adapter must explicitly handle/reject non-finite values to avoid silent changes. |
+| `Real(f64)` | REAL | Approximate binary float, not exact decimal; SQLite compilation rejects non-finite values. |
 | `Text(String)` | TEXT | Own UTF-8 text; reject decoding that cannot preserve the contract. |
 | `Blob(Vec<u8>)` | BLOB | Own bytes; an empty blob remains distinct from NULL. |
 
@@ -34,9 +34,9 @@ where useful and never Eq.
 
 ## SQL subset and capabilities
 
-There is currently **no supported executable SQL subset**. Owned query types now
-describe SELECT/INSERT/UPDATE/DELETE, column/value comparisons, AND/OR grouping,
-SELECT ordering and limit/offset. They have no compiler or execution implementation.
+The compiled SQLite subset is SELECT/INSERT/UPDATE/DELETE, supported column/value
+comparisons, AND/OR grouping, SELECT ordering and limit/offset. It is verified by
+SQL/bind golden tests, not database-result tests. There is no execution implementation.
 Phase 1 targets explicit SQLite insert/read/update/delete, comparisons,
 conjunction/disjunction, null checks, ordering, limit/offset, and basic transactions.
 Joins/aggregates, upserts, returning clauses, savepoints, backend-specific functions,
@@ -65,8 +65,8 @@ schema type checking remain deferred; constructing IR does not validate database
 
 SQL must contain placeholders and an ordered bind vector. Future drivers must use
 runtime binding in that exact order, never value interpolation. Parameter count,
-type compatibility, and unsupported operations need real adapter tests. For the
-planned SeaQuery adapter, use [SQL plus values from build](https://github.com/SeaQL/sea-query),
+type compatibility, and unsupported operations need adapter tests. The implemented
+compiler uses [SQL plus values from build](https://github.com/SeaQL/sea-query),
 not SQL rendered with values injected for debugging. SQLx runtime APIs will avoid
 requiring a database at compile time.
 

@@ -1,8 +1,8 @@
-//! Construct owned query types through the facade; no SQL generation or database I/O.
+//! Compile owned query types through the facade; no database I/O.
 
 use crab_orm::{
     Assignment, Column, ComparisonOperator as Op, Delete, Insert, Ordering, OrmError, Predicate,
-    Projection, Query, Select, SortDirection, Table, Update, Value,
+    Projection, Query, QueryCompiler, Select, SortDirection, SqliteCompiler, Table, Update, Value,
 };
 
 fn main() -> Result<(), OrmError> {
@@ -66,15 +66,19 @@ fn main() -> Result<(), OrmError> {
         Query::Delete(delete),
     ];
     println!(
-        "CrabORM Phase 1.1: constructed {} owned query representations through the facade.",
+        "CrabORM Phase 1.2: compiling {} owned queries to SQLite SQL through the facade.",
         queries.len()
     );
-    println!(
-        "SELECT has grouped predicates, ordering, limit, and offset; UPDATE and DELETE are filtered."
-    );
-    println!(
-        "Construction only: no SQL generated, no database contacted, and no bind values printed."
-    );
-    println!("SQL compilation, SQLite execution, and CRUD persistence remain deferred.");
+    for query in queries {
+        let compiled = SqliteCompiler.compile(&query)?;
+        // Generated SQL contains placeholders; values are deliberately not shown.
+        println!("SQL: {}", compiled.sql);
+        println!(
+            "Parameter count: {} (values redacted)",
+            compiled.params.len()
+        );
+    }
+    println!("Compilation only. No SQLite connection was opened or database contacted.");
+    println!("Database execution and CRUD persistence are not implemented yet.");
     Ok(())
 }

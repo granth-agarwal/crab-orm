@@ -3,7 +3,8 @@
 ## Status
 
 Accepted, 2026-10-22. Owned contracts and facade are implemented in Phase 0;
-SeaQuery and SQLx adapters and substitution conformance are deferred.
+Phase 1.2 implements the SQLite SeaQuery compiler; SQLx execution and substitution
+conformance remain deferred.
 Phase 1.1 replaces the temporary query input with owned domain types in core.
 
 ## Context
@@ -23,11 +24,14 @@ validated identifiers, predicates, and statement types. The query crate owns the
 compiler boundary alone. Construction validates structural invariants, not SQL
 semantics. Later query features must follow their roadmap scope.
 
-A future [SeaQuery](https://github.com/SeaQL/sea-query) compiler adapter translates
-owned input into dialect-specific SQL plus values. Identifiers must be validated
-and quoted for that dialect. A future [SQLx](https://github.com/launchbadge/sqlx)
+The private [SeaQuery](https://github.com/SeaQL/sea-query) adapter now translates
+owned input into SQLite SQL plus values using parameterized build and emitted
+bind order. Identifiers are validated in core and quoted by the SQLite builder.
+Only crab-query depends on SeaQuery 1.0.2, with backend-sqlite enabled and defaults
+disabled. Offset-only queries use a checked internal unbounded-limit adaptation;
+see [compiler details](../sqlite-compiler.md). A future [SQLx](https://github.com/launchbadge/sqlx)
 adapter binds values at runtime and decodes owned rows; no compile-time database
-is required. Neither adapter is added as a dependency before it is implemented.
+is required. Dependencies are added only when their adapter is implemented.
 User values must never be interpolated into SQL. Unsupported operations produce
 explicit errors. Default diagnostics must redact parameters and credentials.
 

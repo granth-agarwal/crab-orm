@@ -1,6 +1,7 @@
 # Contributing
 
-This repository implements Phase 0 foundations and Phase 1.1 query types. Start with the
+This repository implements foundations, owned query types, and Phase 1.2 SQLite
+compilation. Start with the
 [scope](docs/product-scope.md), [architecture](docs/architecture.md), and ADRs linked
 there. Discuss changes to public contracts alongside their limitations; do not
 add placeholders that panic or return invented success.
@@ -24,23 +25,27 @@ git diff --check
 ```
 
 Use `cargo fmt --all` to apply formatting. Add focused tests for actual behavior;
-SQL generation, row mapping, and transactions will need integration/conformance
-tests when they exist. Current tests verify construction invariants and redaction;
-compile-fail doctests guard private fields. They do not prove ORM correctness.
+SQL generation changes must update SQL/bind goldens and cover non-interpolation,
+grouping, and pagination. Row mapping, execution, and transactions will need
+integration/conformance tests when they exist. Current tests verify construction
+invariants, redaction, and compiled output; compile-fail doctests guard private
+fields. They do not prove database execution or ORM correctness.
 Review documentation against the behavior actually implemented before committing.
 
 ## Crate and dependency policy
 
-Keep the dependency graph acyclic: `crab-core` has no internal dependencies;
-`crab-query` and `crab-driver` depend only on it; `crab-orm` depends on those three;
+Keep internal dependencies acyclic: `crab-core` has no internal dependencies;
+`crab-query` and `crab-driver` each depend internally only on it; `crab-orm` depends on those three;
 the TODO example depends only on `crab-orm`. Model metadata and model mapping will
 belong to `crab-orm`; database decoding belongs to its future driver adapter.
-Use owned CrabORM types at public boundaries. SQLx and SeaQuery types must remain
-private to adapters once implemented. Never add speculative crates or unused adapters.
+Use owned CrabORM types at public boundaries. SeaQuery types stay private to the
+SQLite compiler adapter; SQLx types must remain private to a future driver adapter.
+Never add speculative crates or unused adapters.
 
 Add dependencies only for implemented needs, verify current official APIs, review
-licenses/security advisories, and select minimal features. Current code uses only `std`.
-Tokio, SeaQuery, SQLx, and instrumentation dependencies remain deferred until used.
+licenses/security advisories, and select minimal features. SeaQuery 1.0.2 is used
+only by `crab-query`, with default features disabled and `backend-sqlite` enabled.
+Tokio, SQLx, and instrumentation dependencies remain deferred until used.
 Future SQLx execution must use runtime parameter binding and must not introduce
 a compile-time database requirement. Shared dependencies and lints belong in the
 root workspace manifest and must be inherited by member packages.

@@ -3,9 +3,10 @@
 ## Status
 
 Accepted policy, 2026-10-22. Owned SQL/binds and redacted formatting are implemented.
-Raw SQL execution, dialect validation, capability APIs, and database conformance
-are deferred; no executable SQL subset is supported. Phase 1.1 adds owned query
-construction with conservative identifier validation, but no dialect renderer.
+Raw SQL execution, capability APIs, and database conformance remain deferred.
+Phase 1.2 compiles the current owned query subset to SQLite SQL through SeaQuery,
+with quoting, ordered binds, and explicit unsupported-value/range errors. Database
+execution remains absent; SQL/bind goldens do not establish database-result parity.
 
 ## Context
 

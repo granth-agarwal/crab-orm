@@ -27,7 +27,14 @@ name = "crab-query"
 version = "0.1.0"
 dependencies = [
  "crab-core",
+ "sea-query",
 ]
+
+[[package]]
+name = "sea-query"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "546040c653a705e60ec65ecd3191a809603734bebbc225775916dea9ae409b31"
 
 [[package]]
 name = "sqlite-todo"

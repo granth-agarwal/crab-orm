@@ -1,7 +1,8 @@
 # Portable query types: Phase 1.1
 
 All query/domain types live in `crab-core` and are intentionally re-exported by
-`crab-orm`. `crab-query` contains only the compiler interface accepting `&Query`.
+`crab-orm`. `crab-query` contains the compiler interface accepting `&Query` and the
+[Phase 1.2 SQLite compiler](sqlite-compiler.md).
 The former public-field Phase 0 projection input has been replaced, not retained
 as a competing AST. Constructors validate representation invariants only: no SQL
 is rendered, predicates are not evaluated, and no database is contacted.
@@ -17,7 +18,7 @@ SQL fragments, quotes, separators, wildcard names, and NUL are rejected.
 This deliberately narrow subset excludes many legal SQL identifiers. Keywords
 such as `select` are accepted. Identifier equality preserves exact case, but
 duplicate assignment checks use ASCII case-insensitive comparison as described
-below. Future compilers must still quote identifiers for their dialect, enforce
+below. Compilers must still quote identifiers for their dialect, enforce
 backend restrictions, and bind values separately. Validation replaces neither
 quoting nor runtime parameter binding. Qualified names and aliases are deferred.
 
@@ -47,7 +48,7 @@ and adapter checks. Ordinary non-NULL comparisons are not schema type-checked.
 | `Insert` | `new(table, assignments)` requires a non-empty ordered vector with unique columns. Default-values and multi-row inserts are deferred. |
 | `Update` | `new(table, assignments, filter)` requires a filter. `all_rows(table, assignments)` explicitly omits it. Both validate the assignment list. |
 | `Delete` | `new(table, filter)` requires a filter. `all_rows(table)` explicitly omits it. |
-| `Query` | Owns one Select, Insert, Update, or Delete, ready as input to a future compiler. |
+| `Query` | Owns one Select, Insert, Update, or Delete; SqliteCompiler accepts it by reference. |
 
 Insert/update duplicate columns are rejected **ignoring ASCII case**, e.g.
 `title` and `TITLE` conflict. This conservative initial policy avoids ambiguous
@@ -62,8 +63,9 @@ No filter selects all eligible rows. Without ordering, no stable result order is
 promised; include suitable keys when deterministic pagination is needed. Empty
 ordering is allowed. Limits/offsets accept zero (`with_limit(0)` requests no rows)
 and offset can exist without limit. u64 describes non-negative intent, not every
-backend's range; future compilers must reject unrepresentable values or render
-equivalent supported offset-only syntax, never truncate or silently omit options.
+backend's range. SqliteCompiler rejects limits/offsets above i64::MAX and renders
+offset-only queries with a bound -1 unbounded limit, without modifying the IR.
+Options are never truncated or silently omitted.
 
 An unfiltered UPDATE/DELETE means every row is eligible. The named `all_rows`
 constructors record that intent without inserting a safety filter or performing
@@ -121,8 +123,10 @@ Query-tree Debug delegates to Value's payload redaction. Explicit value accessor
 and assignment fields reveal data deliberately and must not be logged blindly.
 Types containing Value derive PartialEq, never Eq, because Value includes f64.
 
-No SeaQuery/SQLx types or dependencies, SQL renderer, compiler implementation,
-database adapter, model mapping, or working CRUD persistence are added.
+The domain crate has no SeaQuery/SQLx types or dependencies. Phase 1.2 implements
+SQL compilation in a private `crab-query` SeaQuery adapter; database execution,
+model mapping, and working CRUD persistence remain deferred.
 Joins, aliases, subqueries, raw SQL nodes, NULL tests, NOT, derive macros, and
-transactions are deferred. Query construction is not proof of compilable SQL,
-correct binding, database semantics, or cross-backend portability.
+transactions are deferred. Query construction alone is not proof of compilable
+SQL; the compiler can reject unsupported values/ranges. Compilation is not proof
+of database semantics or cross-backend portability.

@@ -11,4 +11,4 @@ pub use crab_core::{
     ValidationContext, ValidationError, ValidationReason, Value,
 };
 pub use crab_driver::{ColumnValue, DatabaseExecutor, ExecutionResult, Row};
-pub use crab_query::QueryCompiler;
+pub use crab_query::{QueryCompiler, SqliteCompiler};

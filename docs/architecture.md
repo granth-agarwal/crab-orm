@@ -1,8 +1,8 @@
 # Architecture
 
-Phase 0 foundations and Phase 1.1 owned query types are implemented. There is no
-SQL renderer, connection, executor implementation, transaction handle, model
-mapper, or CRUD persistence.
+Foundations, owned query types, and Phase 1.2 SQLite SQL compilation are implemented.
+There is no connection, executor implementation, transaction handle, model mapper,
+or CRUD persistence.
 
 ## Responsibilities and dependency direction
 
@@ -14,7 +14,8 @@ sqlite-todo -> crab-orm -> crab-query  -> crab-core
 
 `crab-core` owns all domain types: identifiers, predicates, query representations,
 `Value`, `CompiledQuery`, and `OrmError`, with no dependencies.
-`crab-query` owns only the `QueryCompiler` contract accepting core `Query` input.
+`crab-query` owns the `QueryCompiler` contract and a private SQLite SeaQuery adapter
+exposed as `SqliteCompiler`, accepting core `Query` input.
 `crab-driver` owns `DatabaseExecutor`, `ExecutionResult`, `Row`, and `ColumnValue`.
 `crab-orm` deliberately re-exports the public domain contracts and traits; the example
 depends only on that facade. There is no edge between query and driver crates.
@@ -44,20 +45,28 @@ See [query types](query-types.md) for constructors, validation details, and limi
 `QueryCompiler::compile(&self, &Query) -> Result<CompiledQuery, OrmError>` is
 synchronous CPU work, borrows input for one call, and returns owned output. It can
 use static dispatch or `dyn QueryCompiler`; thread-sharing bounds are left to
-callers. The compiler instance will select/configure a dialect. A future SeaQuery
-adapter must translate both input and output without exposing SeaQuery types.
+callers. `SqliteCompiler` fixes the dialect to SQLite and uses SeaQuery 1.0.2 with
+only `backend-sqlite` enabled. It translates input and emitted binds without
+exposing SeaQuery types. There is no generic dialect framework yet.
 An alternative compiler must meet the same semantics before replacing it.
 
 `CompiledQuery { sql: String, params: Vec<Value> }` makes SQL and ordered bind
 values explicitly inspectable. Bind order is placeholder encounter order, never
 map iteration order. This struct performs no validation; manually constructing
-one does not establish SQL safety or placeholder correctness. A future compiler
-must validate identifiers, use placeholders, and return deterministic ordered
-values. Executors must bind each value at runtime, never interpolate user data.
+one does not establish SQL safety or placeholder correctness. SqliteCompiler uses
+validated core identifiers, SeaQuery identifier quoting, and parameterized build
+to return deterministic ordered values. Future executors must actually bind each
+value at runtime, never interpolate user data.
 Identifiers cannot be bound like values: their validation/quoting is separate.
 The input now owns predicate and assignment values. Stored column/assignment/
 ordering vectors preserve caller order; predicate children preserve left-to-right
-order. Placeholder allocation and bind collection remain compiler work.
+order. The adapter uses SeaQuery's emitted Values as the source of bind order.
+It maps all supported predicates, projections, assignments, ordering and pagination;
+explicit full-table mutations remain unfiltered. NULL assignments are bound, NULL
+comparisons remain rejected, non-finite reals and pagination overflow return
+Compile errors. Offset-only SELECT uses a bound -1 unbounded limit without changing
+the input IR. See [compiler details](sqlite-compiler.md) for its checked internal
+marker adaptation and dependency/source verification.
 
 ## Executor and async contract
 
@@ -123,8 +132,9 @@ formatting policy, not memory encryption or a safe logger for arbitrary caller d
 | Decision | Current status | Follow-up |
 | --- | --- | --- |
 | Owned values, SQL/binds, error stages | Implemented with default redaction tests | Real conversion and binding tests |
-| Owned query IR in core | Implemented through Phase 1.1, with invariant tests | Compiler integration and later query features |
-| Compiler and executor boundaries | Compilable traits only | Implement/test adapters |
+| Owned query IR in core | Implemented through Phase 1.1, with invariant tests | Later query features |
+| SQLite compiler | SeaQuery adapter implemented with SQL/bind goldens | Database-result integration tests in execution phase |
+| Executor boundary | Compilable trait only | Implement/test SQLx adapter |
 | Model/mapping ownership | Documented | Explicit metadata and mapping in Phase 1 |
 | Tokio async-first | Accepted, Send futures implemented | Add runtime when execution exists |
 | One-connection transaction lifecycle | Documented only | Handle API, cancellation and cleanup tests |
