@@ -4,7 +4,8 @@
 
 Accepted policy, 2026-10-22. Owned SQL/binds and redacted formatting are implemented.
 Raw SQL execution, dialect validation, capability APIs, and database conformance
-are deferred; no executable SQL subset is supported in Phase 0.
+are deferred; no executable SQL subset is supported. Phase 1.1 adds owned query
+construction with conservative identifier validation, but no dialect renderer.
 
 ## Context
 

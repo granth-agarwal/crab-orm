@@ -1,6 +1,6 @@
 # Contributing
 
-This repository currently implements Phase 0 only. Start with the
+This repository implements Phase 0 foundations and Phase 1.1 query types. Start with the
 [scope](docs/product-scope.md), [architecture](docs/architecture.md), and ADRs linked
 there. Discuss changes to public contracts alongside their limitations; do not
 add placeholders that panic or return invented success.
@@ -25,7 +25,8 @@ git diff --check
 
 Use `cargo fmt --all` to apply formatting. Add focused tests for actual behavior;
 SQL generation, row mapping, and transactions will need integration/conformance
-tests when they exist. The current unit tests verify redaction, not ORM correctness.
+tests when they exist. Current tests verify construction invariants and redaction;
+compile-fail doctests guard private fields. They do not prove ORM correctness.
 Review documentation against the behavior actually implemented before committing.
 
 ## Crate and dependency policy
@@ -38,7 +39,7 @@ Use owned CrabORM types at public boundaries. SQLx and SeaQuery types must remai
 private to adapters once implemented. Never add speculative crates or unused adapters.
 
 Add dependencies only for implemented needs, verify current official APIs, review
-licenses/security advisories, and select minimal features. Phase 0 uses only `std`.
+licenses/security advisories, and select minimal features. Current code uses only `std`.
 Tokio, SeaQuery, SQLx, and instrumentation dependencies remain deferred until used.
 Future SQLx execution must use runtime parameter binding and must not introduce
 a compile-time database requirement. Shared dependencies and lints belong in the

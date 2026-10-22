@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
-description = "Public facade for CrabORM's Phase 0 contracts"
+description = "Public facade for CrabORM contracts and owned query construction"
 
 [dependencies]
 crab-core.workspace = true

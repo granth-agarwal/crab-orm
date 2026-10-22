@@ -1,4 +1,4 @@
-# SQLite TODO: Phase 0 contract inspection
+# SQLite TODO: Phase 1.1 query construction
 
 Run from the workspace root:
 
@@ -6,15 +6,21 @@ Run from the workspace root:
 cargo run -p sqlite-todo --locked
 ```
 
-This synchronous binary imports only the `crab-orm` facade. It constructs a
-`CompiledQuery` with a fixed SQL string selecting `id`, `title`, and `completed`
-from `todos`, with two `?` placeholders and an ordered `Vec<Value>`.
-It prints that fixed SQL, the number of binds, and the Phase 1 status message.
-It does not print bind values or open a database connection.
+This synchronous binary imports only the `crab-orm` facade and constructs:
 
-This demonstrates ownership and explicit inspection of SQL and parameter count.
-There is no SQL compilation, SQL validation, binding/conversion, schema creation,
-execution, row mapping, CRUD, or transaction. The type does not verify that its
-SQL matches its parameters. SQLite execution and CRUD will arrive in Phase 1.
-No runtime is necessary for this contract-only example; future async execution
-will use Tokio. A real TODO service remains a future validation target.
+- A SELECT of `id`, `title`, `completed`, with `(completed = value OR title = value)
+  AND id > value`, ordered by id, with a limit and offset.
+- An INSERT with paired title/completed assignments.
+- An UPDATE of completed, filtered by id.
+- A DELETE filtered by id.
+
+Those expressions describe an owned tree; the program does not render them into
+SQL. It wraps the statements in the core `Query` enum and reports the count and
+construction status. It does not print bind values. All identifiers pass the
+conservative core validation policy. Construction errors propagate as OrmError.
+
+No schema is created, no database is contacted, and no persistence or transaction
+occurs. SQL compilation, parameter binding, SQLite execution, model mapping, and
+working CRUD remain later work. No runtime or database setup is necessary.
+See [query types and invariants](../../docs/query-types.md) for API examples and
+the explicitly named full-table mutation constructors.

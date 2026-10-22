@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
-description = "Compiler boundary and limited owned query input for CrabORM"
+description = "Replaceable compiler boundary for CrabORM-owned queries"
 
 [dependencies]
 crab-core.workspace = true

@@ -1,4 +1,6 @@
 //! Owned domain contracts for CrabORM. No database or SQL builder dependencies.
+//! Phase 1.1 adds validated identifiers and query construction, without rendering
+//! SQL, evaluating predicates, or executing database operations.
 //!
 //! SQLite conversions are planned, not implemented: booleans bind as integer 0/1,
 //! NULL remains distinct from false, zero, empty text, and empty blobs. SQLite
@@ -6,6 +8,18 @@
 //! This initial value set does not cover every database type.
 
 use std::{error::Error, fmt};
+
+mod identifier;
+mod predicate;
+mod query;
+mod validation;
+
+pub use identifier::{Column, Table};
+pub use predicate::{Comparison, ComparisonOperator, Predicate};
+pub use query::{
+    Assignment, Delete, Insert, Ordering, Projection, Query, Select, SortDirection, Update,
+};
+pub use validation::{ValidationContext, ValidationError, ValidationReason};
 
 /// An owned value, independent of a driver or compiler's type system.
 ///
@@ -73,15 +87,15 @@ impl fmt::Display for CompiledQuery {
     }
 }
 
-/// Distinguishable failure stages, with explicitly accessible diagnostic text.
+/// Distinguishable failure stages, with explicitly accessible diagnostics.
 ///
-/// `Display` and `Debug` expose only the failure stage. Messages can contain
+/// `Display` and `Debug` expose only the failure stage. Non-validation messages can contain
 /// driver details, credentials, or values; inspect them only in trusted contexts.
 /// Adapter error types are deliberately absent from this boundary.
 #[derive(Clone, PartialEq, Eq)]
 pub enum OrmError {
     /// Invalid caller input or identifiers.
-    Validation(String),
+    Validation(ValidationError),
     /// SQL compilation failure, including unsupported dialect capabilities.
     Compile(String),
     /// Connection, binding, execution, or decoding failure in a driver.
@@ -123,7 +137,9 @@ impl Error for OrmError {}
 
 #[cfg(test)]
 mod tests {
-    use super::{CompiledQuery, OrmError, Value};
+    use super::{
+        CompiledQuery, OrmError, ValidationContext, ValidationError, ValidationReason, Value,
+    };
 
     #[test]
     fn query_formatting_redacts_sql_and_binds_but_explicit_inspection_preserves_order() {
@@ -166,7 +182,13 @@ mod tests {
     fn error_formatting_preserves_failure_stage_without_diagnostic_secrets() {
         let secret = "password=private-title";
         let errors = [
-            (OrmError::Validation(secret.into()), "validation"),
+            (
+                OrmError::Validation(ValidationError {
+                    context: ValidationContext::Comparison,
+                    reason: ValidationReason::NullComparison,
+                }),
+                "validation",
+            ),
             (OrmError::Compile(secret.into()), "compile"),
             (OrmError::Driver(secret.into()), "driver"),
             (OrmError::Mapping(secret.into()), "mapping"),

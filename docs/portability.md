@@ -1,6 +1,6 @@
 # Portability policy
 
-Phase 0 executes **no SQL on any backend**. Rust and SQLite are the initial target;
+Phase 1.1 constructs queries but executes **no SQL on any backend**. Rust and SQLite are the initial target;
 PostgreSQL/MySQL and Python are later work. Portability means a documented subset
 and explicit capabilities, not identical SQL syntax or coverage of every type.
 
@@ -34,8 +34,9 @@ where useful and never Eq.
 
 ## SQL subset and capabilities
 
-There is currently **no supported executable SQL subset**. The temporary query
-input can describe only selected columns from one table and has no implementation.
+There is currently **no supported executable SQL subset**. Owned query types now
+describe SELECT/INSERT/UPDATE/DELETE, column/value comparisons, AND/OR grouping,
+SELECT ordering and limit/offset. They have no compiler or execution implementation.
 Phase 1 targets explicit SQLite insert/read/update/delete, comparisons,
 conjunction/disjunction, null checks, ordering, limit/offset, and basic transactions.
 Joins/aggregates, upserts, returning clauses, savepoints, backend-specific functions,
@@ -54,9 +55,13 @@ counts must be assessed per backend. A shared suite will establish support.
 
 Dialect compilers must validate and quote table/column identifiers separately
 from values, including escaping embedded delimiters according to backend rules.
-Names are not SQL fragments and cannot be bound as parameters. The Phase 0 Query
-strings are not validated; callers must not mistake them for safe SQL builders.
-Future public identifier types must make qualified names and wildcards explicit.
+Names are not SQL fragments and cannot be bound as parameters. Table/Column
+constructors validate a conservative ASCII subset; qualification is rejected.
+All-column projection has its own explicit representation. Keywords are accepted
+and must still be quoted by a dialect compiler. Validation does not replace
+quoting or runtime binds. See [query policy](query-types.md) for case-insensitive
+assignment duplicate rejection and unsupported NULL comparisons. NULL tests and
+schema type checking remain deferred; constructing IR does not validate database semantics.
 
 SQL must contain placeholders and an ordered bind vector. Future drivers must use
 runtime binding in that exact order, never value interpolation. Parameter count,

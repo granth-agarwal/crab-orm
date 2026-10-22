@@ -1,7 +1,8 @@
 # Architecture
 
-Phase 0 implements contracts and repository foundations only. There is no SQL
-renderer, connection, database executor, transaction handle, model mapper, or CRUD.
+Phase 0 foundations and Phase 1.1 owned query types are implemented. There is no
+SQL renderer, connection, executor implementation, transaction handle, model
+mapper, or CRUD persistence.
 
 ## Responsibilities and dependency direction
 
@@ -11,10 +12,11 @@ sqlite-todo -> crab-orm -> crab-query  -> crab-core
                        -> crab-core
 ```
 
-`crab-core` owns `Value`, `CompiledQuery`, and `OrmError` with no dependencies.
-`crab-query` owns a limited `Query` input and `QueryCompiler` contract.
+`crab-core` owns all domain types: identifiers, predicates, query representations,
+`Value`, `CompiledQuery`, and `OrmError`, with no dependencies.
+`crab-query` owns only the `QueryCompiler` contract accepting core `Query` input.
 `crab-driver` owns `DatabaseExecutor`, `ExecutionResult`, `Row`, and `ColumnValue`.
-`crab-orm` deliberately re-exports those nine public types/traits; the example
+`crab-orm` deliberately re-exports the public domain contracts and traits; the example
 depends only on that facade. There is no edge between query and driver crates.
 Workspace metadata, dependencies, lints, and one generated lockfile are shared as
 described in the [Cargo workspace reference](https://doc.rust-lang.org/cargo/reference/workspaces.html).
@@ -26,13 +28,18 @@ identity map, change tracking, implicit queries, or lazy loading exists yet.
 
 ## Query/compiler boundary
 
-`Query { table: String, columns: Vec<String> }` describes only an unfiltered
-single-table projection. It is deliberately temporary preview input, not the
-Phase 1 CRUD AST, validated metadata, or a raw SQL wrapper. Its names are
-unvalidated. Future implementations must reject empty names/column lists and
-validate/quote each name as one identifier according to the selected dialect;
-they must never interpret these strings as SQL fragments. Qualified names and
-wildcards will require explicit representations later.
+The Phase 0 public-field projection input has been replaced by core's owned
+`Query` enum: Select, Insert, Update, and Delete. Validated `Table` and `Column`
+names preserve case and accept only `[A-Za-z_][A-Za-z0-9_]*`. Future compilers must
+still quote names according to their dialect; names are never SQL fragments.
+Qualification is deferred; `Projection::all()` expresses all columns explicitly.
+
+Private fields and fallible constructors reject empty projections/assignments,
+duplicate assignment columns (ignoring ASCII case), and every NULL comparison.
+Binary AND/OR nodes retain grouping and child order. SELECT has ordering and
+independent optional limit/offset intent; filtered UPDATE/DELETE constructors
+require a predicate, and named `all_rows` constructors explicitly omit it.
+See [query types](query-types.md) for constructors, validation details, and limitations.
 
 `QueryCompiler::compile(&self, &Query) -> Result<CompiledQuery, OrmError>` is
 synchronous CPU work, borrows input for one call, and returns owned output. It can
@@ -48,7 +55,9 @@ one does not establish SQL safety or placeholder correctness. A future compiler
 must validate identifiers, use placeholders, and return deterministic ordered
 values. Executors must bind each value at runtime, never interpolate user data.
 Identifiers cannot be bound like values: their validation/quoting is separate.
-The current input has no predicates or bind-bearing expressions; those are Phase 1.
+The input now owns predicate and assignment values. Stored column/assignment/
+ordering vectors preserve caller order; predicate children preserve left-to-right
+order. Placeholder allocation and bind collection remain compiler work.
 
 ## Executor and async contract
 
@@ -98,9 +107,10 @@ The six owned values cover an initial SQLite-oriented subset, not all database
 types; see [conversion and portability policy](portability.md). `Real(f64)` means
 Value, CompiledQuery, and Row cannot derive `Eq`. Null is a separate value, not
 an absent parameter. `OrmError` distinguishes validation, compile, driver,
-mapping, and transaction failure stages with owned diagnostic messages.
+mapping, and transaction failure stages. Validation carries structured context/
+reason/index data; other failures retain owned diagnostic messages.
 
-Query `Debug`/`Display` hides SQL and all binds, exposing only parameter count.
+CompiledQuery `Debug`/`Display` hides SQL and all binds, exposing only parameter count.
 `Value::Debug` hides payloads, including booleans/numbers and nested row values.
 Error `Debug`/`Display` exposes the failure stage and hides diagnostic messages;
 `Error::source` exposes no driver chain. Public fields/pattern matching enable
@@ -110,10 +120,11 @@ formatting policy, not memory encryption or a safe logger for arbitrary caller d
 
 ## Implemented versus deferred
 
-| Decision | Phase 0 status | Follow-up |
+| Decision | Current status | Follow-up |
 | --- | --- | --- |
 | Owned values, SQL/binds, error stages | Implemented with default redaction tests | Real conversion and binding tests |
-| Compiler and executor boundaries | Compilable traits only | Implement/test adapters and richer IR |
+| Owned query IR in core | Implemented through Phase 1.1, with invariant tests | Compiler integration and later query features |
+| Compiler and executor boundaries | Compilable traits only | Implement/test adapters |
 | Model/mapping ownership | Documented | Explicit metadata and mapping in Phase 1 |
 | Tokio async-first | Accepted, Send futures implemented | Add runtime when execution exists |
 | One-connection transaction lifecycle | Documented only | Handle API, cancellation and cleanup tests |

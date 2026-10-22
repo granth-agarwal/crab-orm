@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
-description = "Inspect a CrabORM Phase 0 query contract without connecting to SQLite"
+description = "Construct CrabORM queries without SQL generation or database execution"
 
 [dependencies]
 crab-orm.workspace = true

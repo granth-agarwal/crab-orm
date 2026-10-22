@@ -4,6 +4,7 @@
 
 Accepted, 2026-10-22. Owned contracts and facade are implemented in Phase 0;
 SeaQuery and SQLx adapters and substitution conformance are deferred.
+Phase 1.1 replaces the temporary query input with owned domain types in core.
 
 ## Context
 
@@ -17,8 +18,10 @@ modularity and SQL inspection; this is a boundary choice, not a uniqueness claim
 Core owns values, SQL plus ordered binds, and errors. Query and driver depend only
 on core; neither depends on the other. The facade re-exports intended contracts
 and will own model metadata/mapping. Public signatures contain no SQLx or SeaQuery
-types. The temporary projection Query is limited preview input; a full CRUD AST
-must follow Phase 1 requirements rather than growing speculatively here.
+types. Phase 1.1 replaces the temporary query input with core's Query enum and
+validated identifiers, predicates, and statement types. The query crate owns the
+compiler boundary alone. Construction validates structural invariants, not SQL
+semantics. Later query features must follow their roadmap scope.
 
 A future [SeaQuery](https://github.com/SeaQL/sea-query) compiler adapter translates
 owned input into dialect-specific SQL plus values. Identifiers must be validated

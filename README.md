@@ -1,17 +1,21 @@
 # CrabORM
 
 A modular SQL ORM project with a Rust core, starting with Rust and SQLite.
-**Current status: Phase 0 foundations, not a usable ORM.** No database is opened
+**Current status: Phase 1.1 query types, not a usable ORM.** No database is opened
 by the current code, and no production readiness or performance advantage is claimed.
 
 ## Implemented
 
 - Owned `Value`, distinguishable `OrmError` failures, and `CompiledQuery` containing
   SQL plus ordered parameters. Default query/error formatting redacts contents.
-- A limited owned query input and `QueryCompiler` interface, without a renderer.
+- Validated table/column identifiers, grouped comparison/AND/OR predicates, and
+  owned SELECT/INSERT/UPDATE/DELETE representations in `crab-core`.
+- SELECT projections, ordering, and limit/offset options; paired, validated
+  mutation assignments and explicit full-table mutation intent.
+- A `QueryCompiler` interface accepting the core `Query` enum, without a renderer.
 - Async `DatabaseExecutor` execute/fetch contracts and owned result types, without
   an executor implementation.
-- An intentional `crab-orm` facade and a runnable contract inspection example.
+- An intentional `crab-orm` facade and a runnable query construction example.
 
 Planned for Phase 1: model metadata/mapping, SQLite CRUD, transactions, a SeaQuery
 compiler adapter, a SQLx runtime execution adapter, and a raw SQL escape hatch.
@@ -44,31 +48,34 @@ cargo run -p sqlite-todo --locked
 git diff --check
 ```
 
-The example manually constructs parameterized SQL through `crab-orm`, prints its
-SQL and bind count, and exits successfully. It neither compiles the SQL nor checks
-its validity, connects to SQLite, executes it, or performs CRUD. Bind values are
-not printed. See the [example guide](examples/sqlite-todo/README.md).
+The example constructs four owned query representations through `crab-orm`,
+including a filtered SELECT with grouped predicates. It reports construction
+only: no SQL is generated and no database is contacted. Bind values are not
+printed. See the [example guide](examples/sqlite-todo/README.md) and
+[query construction reference](docs/query-types.md).
 
 ## Workspace
 
 | Path | Responsibility |
 | --- | --- |
-| `crates/crab-core` | Owned values, compiled queries, errors |
-| `crates/crab-query` | Limited input and replaceable compiler contract |
+| `crates/crab-core` | Owned query/domain types, values, compiled queries, errors |
+| `crates/crab-query` | Replaceable compiler contract accepting core queries |
 | `crates/crab-driver` | Async executor contract and owned results |
 | `crates/crab-orm` | Public facade; future model metadata/mapping |
-| `examples/sqlite-todo` | Phase 0 contract inspection binary |
+| `examples/sqlite-todo` | Query construction binary, without execution |
 | `docs` | Scope research, architecture, portability, and decisions |
 
 All packages are unpublished (`publish = false`). Cargo generates the committed
-workspace `Cargo.lock`. Tests currently cover formatting redaction and explicit
-query inspection; their success is not evidence of ORM or database correctness.
+workspace `Cargo.lock`. Tests cover construction invariants, grouping, ordering,
+redaction, and private construction boundaries; their success is not evidence of
+SQL compilation, ORM persistence, or database correctness.
 CI runs the local gate commands on push and pull requests without a database.
 
 ## Design and contributing
 
 - [Product scope, comparisons, and future validation hypotheses](docs/product-scope.md)
 - [Architecture and implementation status](docs/architecture.md)
+- [Query types, constructors, and validation rules](docs/query-types.md)
 - [Portability and SQLite value policy](docs/portability.md)
 - ADRs: [adapter boundaries](docs/decisions/0001-adapter-boundaries.md),
   [async-first API](docs/decisions/0002-async-first-api.md), and
